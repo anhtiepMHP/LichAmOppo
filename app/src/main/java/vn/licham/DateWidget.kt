@@ -4,9 +4,11 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.widget.RemoteViews
 import java.text.SimpleDateFormat
 import java.util.*
@@ -14,24 +16,32 @@ import java.util.*
 class DateWidget : AppWidgetProvider() {
 
     override fun onUpdate(ctx: Context, mgr: AppWidgetManager, ids: IntArray) {
-        val text = todayText()
         val open = PendingIntent.getActivity(
             ctx, 0, Intent(ctx, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         for (id in ids) {
+            val lock = mgr.getAppWidgetOptions(id)
+                .getInt(AppWidgetManager.OPTION_APPWIDGET_HOST_CATEGORY, -1) ==
+                    AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD
             val rv = RemoteViews(ctx.packageName, R.layout.widget)
-            rv.setTextViewText(R.id.txt, text)
+            rv.setTextViewText(R.id.txt, todayText(lock))
             rv.setOnClickPendingIntent(R.id.root, open)
             mgr.updateAppWidget(id, rv)
         }
         scheduleMidnight(ctx)
     }
 
+    override fun onAppWidgetOptionsChanged(
+        ctx: Context, mgr: AppWidgetManager, id: Int, newOptions: Bundle
+    ) {
+        onUpdate(ctx, mgr, intArrayOf(id))
+    }
+
     override fun onReceive(ctx: Context, intent: Intent) {
         super.onReceive(ctx, intent)
         val a = intent.action
-                if (a == Intent.ACTION_DATE_CHANGED || a == Intent.ACTION_TIME_CHANGED || a == Intent.ACTION_TIMEZONE_CHANGED) {
+        if (a == Intent.ACTION_DATE_CHANGED || a == Intent.ACTION_TIME_CHANGED || a == Intent.ACTION_TIMEZONE_CHANGED) {
             val mgr = AppWidgetManager.getInstance(ctx)
             onUpdate(ctx, mgr, mgr.getAppWidgetIds(ComponentName(ctx, DateWidget::class.java)))
         }
@@ -52,15 +62,22 @@ class DateWidget : AppWidgetProvider() {
     }
 
     companion object {
-        /** Ví dụ: "Friday, 20/11 (12/10 AL)" */
-        fun todayText(): String {
+        /** Màn hình chính: "Friday, 20/11 (12/10 AL)". Màn hình khóa: 3 dòng. */
+        fun todayText(lock: Boolean = false): String {
             val now = Calendar.getInstance()
             val l = LunarCalc.convert(
                 now.get(Calendar.DAY_OF_MONTH), now.get(Calendar.MONTH) + 1, now.get(Calendar.YEAR)
             )
-            val solar = SimpleDateFormat("EEEE, dd/MM", Locale.ENGLISH).format(now.time)
             val leap = if (l.leap) "n" else ""
-            return "$solar (${l.day}/${l.month}$leap AL)"
+            val lunar = "${l.day}/${l.month}$leap AL"
+            return if (lock) {
+                val day = SimpleDateFormat("EEEE", Locale.ENGLISH).format(now.time)
+                val dm = SimpleDateFormat("dd/MM", Locale.ENGLISH).format(now.time)
+                "$day\n$dm\n$lunar"
+            } else {
+                val solar = SimpleDateFormat("EEEE, dd/MM", Locale.ENGLISH).format(now.time)
+                "$solar ($lunar)"
+            }
         }
     }
 }
