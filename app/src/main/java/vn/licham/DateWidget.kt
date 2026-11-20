@@ -9,6 +9,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.TypedValue
 import android.widget.RemoteViews
 import java.text.SimpleDateFormat
 import java.util.*
@@ -26,6 +27,7 @@ class DateWidget : AppWidgetProvider() {
                     AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD
             val rv = RemoteViews(ctx.packageName, R.layout.widget)
             rv.setTextViewText(R.id.txt, todayText(lock))
+            rv.setTextViewTextSize(R.id.txt, TypedValue.COMPLEX_UNIT_SP, if (lock) 14f else 16f)
             rv.setOnClickPendingIntent(R.id.root, open)
             mgr.updateAppWidget(id, rv)
         }
